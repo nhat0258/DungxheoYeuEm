@@ -1,4 +1,90 @@
 local Players = game:GetService("Players")
+local StarterGui = game:GetService("StarterGui")
+local lp = Players.LocalPlayer
+
+local gui = Instance.new("ScreenGui")
+gui.IgnoreGuiInset = true
+gui.ResetOnSpawn = false
+gui.Parent = lp:WaitForChild("PlayerGui")
+
+local shadow = Instance.new("Frame", gui)
+shadow.AnchorPoint = Vector2.new(0.5,0.5)
+shadow.Position = UDim2.fromScale(0.5,0.5)
+shadow.Size = UDim2.fromScale(1,1)
+shadow.BackgroundColor3 = Color3.fromRGB(0,0,0)
+shadow.BackgroundTransparency = 0.35
+shadow.BorderSizePixel = 0
+
+local main = Instance.new("Frame", gui)
+main.AnchorPoint = Vector2.new(0.5,0.5)
+main.Position = UDim2.fromScale(0.5,0.5)
+main.Size = UDim2.fromScale(0.28,0.22)
+main.BackgroundColor3 = Color3.fromRGB(15,18,30)
+main.BorderSizePixel = 0
+
+Instance.new("UICorner", main).CornerRadius = UDim.new(0,18)
+
+local stroke = Instance.new("UIStroke", main)
+stroke.Color = Color3.fromRGB(0,170,255)
+stroke.Thickness = 1.2
+stroke.Transparency = 0.2
+
+local title = Instance.new("TextLabel", main)
+title.Size = UDim2.fromScale(1,0.45)
+title.BackgroundTransparency = 1
+title.Text = "BẠN CÓ PHẢI DOCTOR KHÔNG?"
+title.TextColor3 = Color3.fromRGB(220,235,255)
+title.Font = Enum.Font.GothamBlack
+title.TextScaled = true
+
+local yes = Instance.new("TextButton", main)
+yes.Size = UDim2.fromScale(0.42,0.28)
+yes.Position = UDim2.fromScale(0.05,0.6)
+yes.Text = "YES"
+yes.Font = Enum.Font.GothamBold
+yes.TextScaled = true
+yes.TextColor3 = Color3.fromRGB(0,255,200)
+yes.BackgroundColor3 = Color3.fromRGB(20,35,45)
+yes.BorderSizePixel = 0
+Instance.new("UICorner", yes).CornerRadius = UDim.new(0,14)
+
+local ys = Instance.new("UIStroke", yes)
+ys.Color = Color3.fromRGB(0,255,200)
+ys.Thickness = 1
+
+local no = Instance.new("TextButton", main)
+no.Size = UDim2.fromScale(0.42,0.28)
+no.Position = UDim2.fromScale(0.53,0.6)
+no.Text = "NO"
+no.Font = Enum.Font.GothamBold
+no.TextScaled = true
+no.TextColor3 = Color3.fromRGB(255,80,80)
+no.BackgroundColor3 = Color3.fromRGB(40,20,20)
+no.BorderSizePixel = 0
+Instance.new("UICorner", no).CornerRadius = UDim.new(0,14)
+
+local ns = Instance.new("UIStroke", no)
+ns.Color = Color3.fromRGB(255,80,80)
+ns.Thickness = 1
+
+no.MouseButton1Click:Connect(function()
+	gui:Destroy()
+	StarterGui:SetCore("SendNotification",{
+		Title = "ERROR",
+		Text = "ACCESS DENIED",
+		Duration = 3
+	})
+end)
+
+yes.MouseButton1Click:Connect(function()
+	gui:Destroy()
+	StarterGui:SetCore("SendNotification",{
+		Title = "ACCESS GRANTED",
+		Text = "Hải À VERIFIED",
+		Duration = 3
+	})
+
+	local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local RunService = game:GetService("RunService")
 local HttpService = game:GetService("HttpService")
@@ -7,15 +93,14 @@ local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
 local Lighting = game:GetService("Lighting")
 local CoreGui = game:GetService("CoreGui")
-local VirtualInputManager = game:GetService("VirtualInputManager")
 
 local RedzLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/nhat0258/Redz-UI-Library/refs/heads/main/Main.lua"))()
 
-local WindowName = "Nexus Stella"
+local WindowName = "Nexus Stella ⭐"
 local Window = RedzLib:MakeWindow({
-    Title = "Nexus Stella ⭐",
-    SubTitle = "Made By nhat0258",
-    SaveFolder = "NexusStella"
+    Title = WindowName,
+    SubTitle = "Clean Code",
+    SaveFolder = "NexusStella_Clean"
 })
 
 local MainTab = Window:MakeTab({ "Main", "home" })
@@ -613,6 +698,101 @@ VisualTab:AddButton({ Name = "Refresh ESP", Callback = function() if ESPEnabled 
 
 Toggles["AutoHop"] = SettingTab:AddToggle({ Name = "Auto Hop", Default = false, Callback = function(v) AutoHopEnabled = v; if v then AutoHopConnection = RunService.Heartbeat:Connect(function() local PlaceId = game.PlaceId local function GetServers(cursor) local url = "https://games.roblox.com/v1/games/" .. PlaceId .. "/servers/Public?sortOrder=Asc&limit=100" if cursor then url = url .. "&cursor=" .. cursor end return HttpService:JSONDecode(game:HttpGet(url)) end local cursor = nil while true do local data = GetServers(cursor) for _, server in ipairs(data.data) do if server.playing >= 1 and server.playing < server.maxPlayers and server.id ~= game.JobId then TeleportService:TeleportToPlaceInstance(PlaceId, server.id, LocalPlayer) return end end cursor = data.nextPageCursor if not cursor then break end end task.wait(5) end) else if AutoHopConnection then AutoHopConnection:Disconnect() end end end})
 
+local function CreateLogo()
+    if CoreGui:FindFirstChild("NexusLogoGui") then
+        CoreGui:FindFirstChild("NexusLogoGui"):Destroy()
+    end
+
+    local ScreenGui = Instance.new("ScreenGui")
+    ScreenGui.Name = "NexusLogoGui"
+    ScreenGui.Parent = CoreGui
+    ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    ScreenGui.DisplayOrder = 10000 
+
+    local LogoButton = Instance.new("ImageButton")
+    LogoButton.Name = "Logo"
+    LogoButton.Parent = ScreenGui
+    LogoButton.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    LogoButton.BackgroundTransparency = 0.5
+    LogoButton.Position = UDim2.new(0.1, 0, 0.1, 0)
+    LogoButton.Size = UDim2.new(0, 50, 0, 50)
+    LogoButton.Active = true
+    
+    local UICorner = Instance.new("UICorner")
+    UICorner.CornerRadius = UDim.new(0, 12)
+    UICorner.Parent = LogoButton
+
+    local UIStroke = Instance.new("UIStroke")
+    UIStroke.Parent = LogoButton
+    UIStroke.Color = Color3.fromRGB(255, 255, 255)
+    UIStroke.Thickness = 1
+    UIStroke.Transparency = 0.5
+
+    task.spawn(function()
+        local success, imgAsset = pcall(function()
+            local fileName = "NexusLogo_reFX.png"
+            local url = "https://raw.githubusercontent.com/nguyennhlat2004/Roblox-Api/main/reFX.png"
+            if not isfile(fileName) then writefile(fileName, game:HttpGet(url)) end
+            return getcustomasset(fileName)
+        end)
+        if success and imgAsset then LogoButton.Image = imgAsset else LogoButton.Image = "rbxassetid://13347535978" end
+    end)
+
+    local dragging, dragInput, dragStart, startPos
+    LogoButton.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = LogoButton.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then dragging = false end
+            end)
+        end
+    end)
+    LogoButton.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then dragInput = input end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and input == dragInput then
+            local delta = input.Position - dragStart
+            LogoButton.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end)
+
+    LogoButton.MouseButton1Click:Connect(function()
+        local found = false
+        local targetName = WindowName 
+
+        for _, gui in pairs(CoreGui:GetChildren()) do
+            if gui:IsA("ScreenGui") and gui.Name ~= "NexusLogoGui" then
+                local descendants = gui:GetDescendants()
+                for _, desc in pairs(descendants) do
+                    if desc:IsA("TextLabel") and desc.Text == targetName then
+                        gui.Enabled = not gui.Enabled
+                        found = true
+                        break
+                    end
+                end
+                if found then break end
+            end
+        end
+        
+        if not found then
+            for _, gui in pairs(CoreGui:GetChildren()) do
+                if gui:IsA("ScreenGui") and gui.Name ~= "NexusLogoGui" and gui.Name ~= "RobloxGui" then 
+                    local mainFrame = gui:FindFirstChild("Main")
+                    if mainFrame then
+                        gui.Enabled = not gui.Enabled
+                        break
+                    end
+                end
+            end
+        end
+    end)
+end
+
+CreateLogo()
+
 local FolderName = "NexusStella"
 local FileName = "Config.json"
 local function SaveConfig()
@@ -653,3 +833,4 @@ local CharFolder = getCharacterFolder()
 CharFolder.ChildAdded:Connect(function(char) if ESPEnabled then task.wait(0.5) createESP(char) end end)
 CharFolder.ChildRemoved:Connect(function(char) if ESPEnabled then removeESP(char) end end)
 LoadConfig()
+end)
