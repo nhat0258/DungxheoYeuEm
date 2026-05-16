@@ -12,6 +12,7 @@ local isPaused = false
 local isFinished = false
 local autoExecActive = false
 local hasStarted = false
+local configLoaded = false
 local currentStatusBase = "IDLE"
 local CONFIG_FILE = "NexusDeadRailsBond.json"
 local autoExecFile = "NexusAutoExec_v2.txt"
@@ -155,18 +156,21 @@ end)
 
 task.spawn(function()
     while true do
-        pcall(function()
-            local config = {
-                position = {
-                    X = {MainFrame.Position.X.Scale, MainFrame.Position.X.Offset},
-                    Y = {MainFrame.Position.Y.Scale, MainFrame.Position.Y.Offset}
-                },
-                autoExecActive = autoExecActive,
-                hasStarted = hasStarted,
-                isPaused = isPaused
-            }
-            writefile(CONFIG_FILE, HttpService:JSONEncode(config))
-        end)
+        if configLoaded then
+            pcall(function()
+                local config = {
+                    position = {
+                        X = {MainFrame.Position.X.Scale, MainFrame.Position.X.Offset},
+                        Y = {MainFrame.Position.Y.Scale, MainFrame.Position.Y.Offset}
+                    },
+                    autoExecActive = autoExecActive,
+                    hasStarted = hasStarted,
+                    isPaused = isPaused,
+                    guiEnabled = ScreenGui.Enabled
+                }
+                writefile(CONFIG_FILE, HttpService:JSONEncode(config))
+            end)
+        end
         task.wait(0.1)
     end
 end)
@@ -214,8 +218,15 @@ function loadConfig()
                     startFarming()
                 end
             end
+            if data.guiEnabled ~= nil then
+                ScreenGui.Enabled = data.guiEnabled
+                if NotifyFrame then
+                    NotifyFrame.Visible = not data.guiEnabled
+                end
+            end
         end
     end
+    configLoaded = true
 end
 
 ToggleBtn.MouseButton1Click:Connect(function()
