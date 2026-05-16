@@ -17,6 +17,7 @@ local currentStatusBase = "IDLE"
 local CONFIG_FILE = "NexusDeadRailsBond.json"
 local autoExecFile = "NexusAutoExec_v2.txt"
 local WindowName = "NexusHub_V2"
+local healPickupCooldown = false
 
 local NotifyFrame
 local NStatus
@@ -263,44 +264,46 @@ task.spawn(function()
         while not hasStarted do task.wait(0.1) end
         while hasStarted do
             if not isPaused and not isFinished then
-                pcall(function()
-                    remoteAction:FireServer(v1)
-                    remoteAction:FireServer(v2)
-                end)
-                overallStep = overallStep + 1
-                local progress = overallStep / (3 * 2000)
-                local contentSize = UDim2.new(math.clamp(progress, 0, 1), 0, 1, 0)
-                ProgFill.Size = contentSize
-                if NProgFill then
-                    NProgFill.Size = contentSize
-                end
-                v1 = v1 + 1
-                v2 = v2 - 1
-                if v1 > FARM_V1_END then
-                    loop = loop + 1
-                    v1 = FARM_V1_START
-                    v2 = FARM_V2_START
-                    if loop > 3 then
-                        isFinished = true
-                        currentStatusBase = "Play Again"
-                        pcall(function() lp.Character.Humanoid.Health = 0 end)
-                        task.wait(11)
-                        repeat
-                            pcall(function() ReplicatedStorage.Remotes.EndDecision:FireServer(false) end)
-                            task.wait(1)
-                        until lp.Character and lp.Character:FindFirstChild("Humanoid") and lp.Character.Humanoid.Health > 0
-                        isFinished = false
-                        hasStarted = false
-                        isPaused = false
-                        elapsedSeconds = 0
-                        ToggleBtn.Text = "START FARM BOND"
-                        ToggleBtn.BackgroundColor3 = Color3.fromRGB(0, 115, 230)
-                        currentStatusBase = "IDLE"
-                        ProgFill.Size = UDim2.new(0, 0, 1, 0)
-                        if NProgFill then
-                            NProgFill.Size = UDim2.new(0, 0, 1, 0)
+                if not healPickupCooldown then
+                    pcall(function()
+                        remoteAction:FireServer(v1)
+                        remoteAction:FireServer(v2)
+                    end)
+                    overallStep = overallStep + 1
+                    local progress = overallStep / (3 * 2000)
+                    local contentSize = UDim2.new(math.clamp(progress, 0, 1), 0, 1, 0)
+                    ProgFill.Size = contentSize
+                    if NProgFill then
+                        NProgFill.Size = contentSize
+                    end
+                    v1 = v1 + 1
+                    v2 = v2 - 1
+                    if v1 > FARM_V1_END then
+                        loop = loop + 1
+                        v1 = FARM_V1_START
+                        v2 = FARM_V2_START
+                        if loop > 3 then
+                            isFinished = true
+                            currentStatusBase = "Play Again"
+                            pcall(function() lp.Character.Humanoid.Health = 0 end)
+                            task.wait(11)
+                            repeat
+                                pcall(function() ReplicatedStorage.Remotes.EndDecision:FireServer(false) end)
+                                task.wait(1)
+                            until lp.Character and lp.Character:FindFirstChild("Humanoid") and lp.Character.Humanoid.Health > 0
+                            isFinished = false
+                            hasStarted = false
+                            isPaused = false
+                            elapsedSeconds = 0
+                            ToggleBtn.Text = "START FARM BOND"
+                            ToggleBtn.BackgroundColor3 = Color3.fromRGB(0, 115, 230)
+                            currentStatusBase = "IDLE"
+                            ProgFill.Size = UDim2.new(0, 0, 1, 0)
+                            if NProgFill then
+                                NProgFill.Size = UDim2.new(0, 0, 1, 0)
+                            end
+                            startFarming()
                         end
-                        startFarming()
                     end
                 end
             end
@@ -487,52 +490,59 @@ local function CreateLogo()
     end)
 end
 
-CreateLogo()
-loadConfig()
-
 task.spawn(function()
     while true do
-        task.wait(0.3)
-        local char = lp.Character
-        if not char then continue end
-        local hum = char:FindFirstChild("Humanoid")
-        if not hum then continue end
-        local health = hum.Health
-        if health < 99 then
-            local objectModels = workspace:FindFirstChild("ObjectModels")
-            if objectModels then
-                for _, bandage in pairs(objectModels:GetChildren()) do
-                    if bandage.Name:lower() == "bandage" then
-                        local serverEntity = bandage:FindFirstChild("serverEntity")
-                        if serverEntity and typeof(serverEntity.Value) == "number" then
-                            pcall(function()
-                                remoteStore:FireServer(serverEntity.Value)
-                            end)
-                            local attempts = 0
-                            while attempts < 10 do
-                                task.wait(0.2)
-                                local bp = lp.Backpack
-                                if bp and bp:FindFirstChild("Bandage") then
-                                    bp.Bandage.Parent = char
-                                    task.wait(0.1)
-                                    local useRemote = char.Bandage:FindFirstChild("Use")
-                                    if useRemote then
-                                        pcall(function()
-                                            useRemote:FireServer()
-                                        end)
-                                    end
+        if hasStarted and not isFinished then
+            local character = lp.Character
+            if character and character:FindFirstChild("Humanoid") then
+                local humanoid = character.Humanoid
+                local maxHealth = humanoid.MaxHealth
+                if humanoid.Health < maxHealth then
+                    local backpack = lp.Backpack
+                    local bandageTool = backpack:FindFirstChild("Bandage")
+                    if bandageTool then
+                        if not character:FindFirstChild("Bandage") then
+                            humanoid:EquipTool(bandageTool)
+                        end
+                        while humanoid.Health < maxHealth do
+                            local charBandage = character:FindFirstChild("Bandage")
+                            if charBandage then
+                                pcall(function()
+                                    charBandage.Use:FireServer()
+                                end)
+                            else
+                                break
+                            end
+                            task.wait(0.3)
+                        end
+                    else
+                        local objectModels = workspace:FindFirstChild("ObjectModels")
+                        if objectModels then
+                            local validBandage = nil
+                            local serverEntityValue = nil
+                            for _, child in ipairs(objectModels:GetChildren()) do
+                                if child.Name == "bandage" and child:FindFirstChild("serverEntity") then
+                                    validBandage = child
+                                    serverEntityValue = child.serverEntity.Value
                                     break
                                 end
-                                attempts = attempts + 1
                             end
-                            if hum.Health >= 100 then break end
+                            if validBandage and serverEntityValue then
+                                healPickupCooldown = true
+                                pcall(function()
+                                    remoteStore:FireServer(serverEntityValue)
+                                end)
+                                task.wait(0.5)
+                                healPickupCooldown = false
+                            end
                         end
                     end
                 end
             end
-            while hum.Health < 100 do
-                task.wait(0.3)
-            end
         end
+        task.wait(1)
     end
 end)
+
+CreateLogo()
+loadConfig()
