@@ -327,53 +327,6 @@ task.spawn(function()
     end
 end)
 
--- Vòng lặp chạy ngầm tự động hồi máu bằng Bandage khi tụt < 99% máu
-task.spawn(function()
-    while true do
-        pcall(function()
-            local char = lp.Character or lp.CharacterAdded:Wait()
-            local hum = char:WaitForChild("Humanoid", 3)
-            
-            if hum and hum.Health < 99 then
-                -- Lặp xử lý cho tới khi hồi đủ từ 100 máu trở lên
-                while hum and hum.Health < 100 do
-                    local objectModels = workspace:FindFirstChild("ObjectModels")
-                    if objectModels then
-                        -- Quét tìm bandage trong ObjectModels
-                        for _, obj in pairs(objectModels:GetChildren()) do
-                            if obj.Name == "bandage" and obj:FindFirstChild("serverEntity") then
-                                local entityId = obj.serverEntity.Value
-                                
-                                -- Gửi tín hiệu lấy/mua bandage
-                                remoteStore:FireServer(entityId)
-                                task.wait(0.2)
-                                
-                                -- Kiểm tra xem đã có Bandage trong Backpack chưa
-                                local bandageInBackpack = lp.Backpack:FindFirstChild("Bandage")
-                                if bandageInBackpack then
-                                    -- Trang bị (Equip) Bandage lên tay
-                                    hum:EquipTool(bandageInBackpack)
-                                    task.wait(0.1)
-                                    
-                                    -- Kích hoạt sử dụng Bandage
-                                    local charBandage = char:FindFirstChild("Bandage")
-                                    if charBandage and charBandage:FindFirstChild("Use") then
-                                        charBandage.Use:FireServer()
-                                    end
-                                    task.wait(0.5) -- Đợi xử lý hồi máu
-                                    break -- Thoát vòng lặp for để quét lại máu mới
-                                end
-                            end
-                        end
-                    end
-                    task.wait(0.3) -- Giãn cách quét lại nếu chưa đạt 100 máu
-                end
-            end
-        end)
-        task.wait(0.5) -- Chu kỳ kiểm tra máu tổng thể
-    end
-end)
-
 function setAutoExec(state)
     if state then
         autoExecActive = true
@@ -537,3 +490,49 @@ end
 CreateLogo()
 loadConfig()
 
+task.spawn(function()
+    while true do
+        task.wait(0.3)
+        local char = lp.Character
+        if not char then continue end
+        local hum = char:FindFirstChild("Humanoid")
+        if not hum then continue end
+        local health = hum.Health
+        if health < 99 then
+            local objectModels = workspace:FindFirstChild("ObjectModels")
+            if objectModels then
+                for _, bandage in pairs(objectModels:GetChildren()) do
+                    if bandage.Name:lower() == "bandage" then
+                        local serverEntity = bandage:FindFirstChild("serverEntity")
+                        if serverEntity and typeof(serverEntity.Value) == "number" then
+                            pcall(function()
+                                remoteStore:FireServer(serverEntity.Value)
+                            end)
+                            local attempts = 0
+                            while attempts < 10 do
+                                task.wait(0.2)
+                                local bp = lp.Backpack
+                                if bp and bp:FindFirstChild("Bandage") then
+                                    bp.Bandage.Parent = char
+                                    task.wait(0.1)
+                                    local useRemote = char.Bandage:FindFirstChild("Use")
+                                    if useRemote then
+                                        pcall(function()
+                                            useRemote:FireServer()
+                                        end)
+                                    end
+                                    break
+                                end
+                                attempts = attempts + 1
+                            end
+                            if hum.Health >= 100 then break end
+                        end
+                    end
+                end
+            end
+            while hum.Health < 100 do
+                task.wait(0.3)
+            end
+        end
+    end
+end)
