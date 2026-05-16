@@ -17,7 +17,7 @@ local isFinished = false
 local autoToggleActive = false
 local hasStarted = false
 local configLoaded = false
-local currentStatusBase = "IDLE"
+local currentStatusBase = "Idle"
 local healPickupCooldown = false
 
 local FOLDER_NAME = "Nexus Hub Dead Rails"
@@ -26,6 +26,22 @@ local WindowName = "NexusHub"
 
 local NotifyFrame, NStatus, NProgFill
 local elapsedSeconds = 0
+
+local queue_on_teleport = queue_on_teleport or (syn and syn.queue_on_teleport) or (fluxus and fluxus.queue_on_teleport)
+if queue_on_teleport then
+    local teleportScript = [[
+        repeat task.wait() until game:IsLoaded()
+        pcall(function()
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/nhat0258/DungxheoYeuEm/refs/heads/main/Auto-Bond.lua"))()
+        end)
+    ]]
+    queue_on_teleport(teleportScript)
+    lp.OnTeleport:Connect(function(state)
+        if state == Enum.TeleportState.Started then
+            queue_on_teleport(teleportScript)
+        end
+    end)
+end
 
 local function createFolder()
     if not isfolder(FOLDER_NAME) then
@@ -43,7 +59,7 @@ ScreenGui.Name = WindowName
 ScreenGui.Parent = CoreGui
 
 local MainFrameHeight = 135
-local isLobby = (PlaceId == 70876832253163)
+local isLobby = (PlaceId == 116495829188952)
 if isLobby then
     MainFrameHeight = 70
 end
@@ -99,7 +115,7 @@ if not isLobby then
     StatusLabel.Position = UDim2.new(0, 10, 0, 30)
     StatusLabel.Size = UDim2.new(1, -20, 0, 12)
     StatusLabel.Font = Enum.Font.FredokaOne
-    StatusLabel.Text = "00m:00s | IDLE"
+    StatusLabel.Text = "00m:00s | Idle"
     StatusLabel.TextColor3 = Color3.fromRGB(140, 140, 140)
     StatusLabel.TextSize = 9
     StatusLabel.TextXAlignment = Enum.TextXAlignment.Center
@@ -134,7 +150,7 @@ local autoBtnAction = "replay"
 if isLobby then
     autoBtnText = "Auto Start Game: Off"
     autoBtnAction = "startgame"
-elseif PlaceId == 116495829188952 then
+elseif PlaceId == 70876832253163 then
     autoBtnText = "Auto Play Again: Off"
     autoBtnAction = "replay"
 end
@@ -306,7 +322,7 @@ task.spawn(function()
                             currentStatusBase = "Play Again"
                             pcall(function() lp.Character.Humanoid.Health = 0 end)
                             task.wait(11)
-                            if PlaceId == 116495829188952 then
+                            if PlaceId == 70876832253163 then
                                 repeat
                                     pcall(function() ReplicatedStorage.Remotes.EndDecision:FireServer(false) end)
                                     task.wait(1)
@@ -320,7 +336,7 @@ task.spawn(function()
                                 ToggleBtn.Text = "Start Farm Bond"
                                 ToggleBtn.BackgroundColor3 = Color3.fromRGB(0, 115, 230)
                             end
-                            currentStatusBase = "IDLE"
+                            currentStatusBase = "Idle"
                             if ProgFill then ProgFill.Size = UDim2.new(0, 0, 1, 0) end
                             if NProgFill then NProgFill.Size = UDim2.new(0, 0, 1, 0) end
                             if autoToggleActive and not isLobby then
@@ -464,7 +480,7 @@ local function CreateLogo()
     NStatus.Position = UDim2.new(0, 10, 0, 6)
     NStatus.Size = UDim2.new(1, -20, 0, 12)
     NStatus.Font = Enum.Font.FredokaOne
-    NStatus.Text = "00m:00s | IDLE"
+    NStatus.Text = "00m:00s | Idle"
     NStatus.TextColor3 = Color3.fromRGB(240, 240, 240)
     NStatus.TextSize = 9
     NStatus.TextXAlignment = Enum.TextXAlignment.Left
