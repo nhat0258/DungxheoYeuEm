@@ -93,7 +93,7 @@ StatusLabel.BackgroundTransparency = 1
 StatusLabel.Position = UDim2.new(0, 10, 0, 30)
 StatusLabel.Size = UDim2.new(1, -20, 0, 12)
 StatusLabel.Font = Enum.Font.FredokaOne
-StatusLabel.Text = "00.00 | IDLE"
+StatusLabel.Text = "00m:00s | IDLE"
 StatusLabel.TextColor3 = Color3.fromRGB(140, 140, 140)
 StatusLabel.TextSize = 9
 StatusLabel.TextXAlignment = Enum.TextXAlignment.Center
@@ -125,7 +125,7 @@ local function btn(txt, pos, clr)
     return t
 end
 
-local ToggleBtn = btn("START", UDim2.new(0, 10, 0, 56), Color3.fromRGB(0, 115, 230))
+local ToggleBtn = btn("START FARM BOND", UDim2.new(0, 10, 0, 56), Color3.fromRGB(0, 115, 230))
 local AutoExecBtn = btn("AUTO EXEC: OFF", UDim2.new(0, 10, 0, 94), Color3.fromRGB(28, 28, 33))
 
 local dragging, dStart, sPos = false, nil, nil
@@ -149,24 +149,27 @@ UserInputService.InputEnded:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 then
         if dragging then
             dragging = false
-            saveConfig()
         end
     end
 end)
 
-function saveConfig()
-    local config = {
-        position = {
-            X = {MainFrame.Position.X.Scale, MainFrame.Position.X.Offset},
-            Y = {MainFrame.Position.Y.Scale, MainFrame.Position.Y.Offset}
-        },
-        autoExecActive = autoExecActive,
-        hasStarted = hasStarted
-    }
-    pcall(function()
-        writefile(CONFIG_FILE, HttpService:JSONEncode(config))
-    end)
-end
+task.spawn(function()
+    while true do
+        pcall(function()
+            local config = {
+                position = {
+                    X = {MainFrame.Position.X.Scale, MainFrame.Position.X.Offset},
+                    Y = {MainFrame.Position.Y.Scale, MainFrame.Position.Y.Offset}
+                },
+                autoExecActive = autoExecActive,
+                hasStarted = hasStarted,
+                isPaused = isPaused
+            }
+            writefile(CONFIG_FILE, HttpService:JSONEncode(config))
+        end)
+        task.wait(0.1)
+    end
+end)
 
 local remoteAction = ReplicatedStorage.Shared.Universe.Network.RemoteEvent.Actionable
 local remoteStore = ReplicatedStorage.Shared.Universe.Network.RemoteEvent.Store
@@ -176,18 +179,16 @@ local function startFarming()
     if isFinished then return end
     isPaused = false
     hasStarted = true
-    ToggleBtn.Text = "PAUSE"
+    ToggleBtn.Text = "PAUSE FARM"
     ToggleBtn.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
     currentStatusBase = "Bond Collecting"
-    saveConfig()
 end
 
 local function pauseFarming()
     isPaused = true
-    ToggleBtn.Text = "CONTINUE"
+    ToggleBtn.Text = "CONTINUE FARM"
     ToggleBtn.BackgroundColor3 = Color3.fromRGB(0, 115, 230)
     currentStatusBase = "Temporarily Suspended"
-    saveConfig()
 end
 
 function loadConfig()
@@ -203,7 +204,15 @@ function loadConfig()
                 setAutoExec(data.autoExecActive)
             end
             if data.hasStarted == true then
-                startFarming()
+                if data.isPaused == true then
+                    isPaused = true
+                    hasStarted = true
+                    ToggleBtn.Text = "CONTINUE FARM"
+                    ToggleBtn.BackgroundColor3 = Color3.fromRGB(0, 115, 230)
+                    currentStatusBase = "Temporarily Suspended"
+                else
+                    startFarming()
+                end
             end
         end
     end
@@ -273,14 +282,13 @@ task.spawn(function()
                         hasStarted = false
                         isPaused = false
                         elapsedSeconds = 0
-                        ToggleBtn.Text = "START"
+                        ToggleBtn.Text = "START FARM BOND"
                         ToggleBtn.BackgroundColor3 = Color3.fromRGB(0, 115, 230)
                         currentStatusBase = "IDLE"
                         ProgFill.Size = UDim2.new(0, 0, 1, 0)
                         if NProgFill then
                             NProgFill.Size = UDim2.new(0, 0, 1, 0)
                         end
-                        saveConfig()
                         startFarming()
                     end
                 end
@@ -298,7 +306,7 @@ task.spawn(function()
         local dots = string.rep(".", dotCount)
         local minutes = math.floor(elapsedSeconds / 60)
         local seconds = elapsedSeconds % 60
-        local timeStr = string.format("%02d.%02d", minutes, seconds)
+        local timeStr = string.format("%02dm:%02ds", minutes, seconds)
         local totalTxt = timeStr .. " | " .. currentStatusBase .. dots
         StatusLabel.Text = totalTxt
         if NStatus then
@@ -351,7 +359,6 @@ function setAutoExec(state)
         AutoExecBtn.BackgroundColor3 = Color3.fromRGB(28, 28, 33)
         pcall(function() delfile(autoExecFile) end)
     end
-    saveConfig()
 end
 
 AutoExecBtn.MouseButton1Click:Connect(function()
@@ -417,7 +424,7 @@ local function CreateLogo()
     NStatus.Position = UDim2.new(0, 10, 0, 6)
     NStatus.Size = UDim2.new(1, -20, 0, 12)
     NStatus.Font = Enum.Font.FredokaOne
-    NStatus.Text = "00.00 | IDLE"
+    NStatus.Text = "00m:00s | IDLE"
     NStatus.TextColor3 = Color3.fromRGB(240, 240, 240)
     NStatus.TextSize = 9
     NStatus.TextXAlignment = Enum.TextXAlignment.Left
@@ -471,3 +478,4 @@ end
 
 CreateLogo()
 loadConfig()
+
