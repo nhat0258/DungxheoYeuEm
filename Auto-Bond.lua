@@ -8,20 +8,50 @@ local HttpService = game:GetService("HttpService")
 local lp = Players.LocalPlayer
 local pGui = lp:WaitForChild("PlayerGui")
 
-if CoreGui:FindFirstChild("NexusHub_V2") then
-    CoreGui.NexusHub_V2:Destroy()
+local isPaused = false
+local isFinished = false
+local autoExecActive = false
+local hasStarted = false
+local currentStatusBase = "IDLE"
+local CONFIG_FILE = "NexusDeadRailsBond.json"
+local autoExecFile = "NexusAutoExec_v2.txt"
+local WindowName = "NexusHub_V2"
+
+local NotifyFrame
+local NStatus
+local NProgFill
+local elapsedSeconds = 0
+
+local queue_on_teleport = queue_on_teleport or (syn and syn.queue_on_teleport) or (fluxus and fluxus.queue_on_teleport)
+if queue_on_teleport then
+    local teleportScript = [[
+        repeat task.wait() until game:IsLoaded()
+        pcall(function()
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/nhat0258/DungxheoYeuEm/refs/heads/main/Auto-Bond.lua"))()
+        end)
+    ]]
+    queue_on_teleport(teleportScript)
+    lp.OnTeleport:Connect(function(state)
+        if state == Enum.TeleportState.Started then
+            queue_on_teleport(teleportScript)
+        end
+    end)
+end
+
+if CoreGui:FindFirstChild(WindowName) then
+    CoreGui[WindowName]:Destroy()
 end
 
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "NexusHub_V2"
+ScreenGui.Name = WindowName
 ScreenGui.Parent = CoreGui
 
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
 MainFrame.Parent = ScreenGui
 MainFrame.BackgroundColor3 = Color3.fromRGB(12, 12, 16)
-MainFrame.Position = UDim2.new(0.5, -85, 0.5, -95)
-MainFrame.Size = UDim2.new(0, 170, 0, 190)
+MainFrame.Position = UDim2.new(0.5, -85, 0.5, -67)
+MainFrame.Size = UDim2.new(0, 170, 0, 135)
 MainFrame.ClipsDescendants = true
 Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
 
@@ -63,7 +93,7 @@ StatusLabel.BackgroundTransparency = 1
 StatusLabel.Position = UDim2.new(0, 10, 0, 30)
 StatusLabel.Size = UDim2.new(1, -20, 0, 12)
 StatusLabel.Font = Enum.Font.FredokaOne
-StatusLabel.Text = "IDLE"
+StatusLabel.Text = "00.00 | IDLE"
 StatusLabel.TextColor3 = Color3.fromRGB(140, 140, 140)
 StatusLabel.TextSize = 9
 StatusLabel.TextXAlignment = Enum.TextXAlignment.Center
@@ -124,11 +154,6 @@ UserInputService.InputEnded:Connect(function(input)
     end
 end)
 
-local isPaused, isFinished, autoExecActive = false, false, false
-local hasStarted = false
-local currentStatusBase = "IDLE"
-local CONFIG_FILE = "NexusDeadRailsBond.json"
-
 function saveConfig()
     local config = {
         position = {
@@ -141,25 +166,6 @@ function saveConfig()
     pcall(function()
         writefile(CONFIG_FILE, HttpService:JSONEncode(config))
     end)
-end
-
-function loadConfig()
-    if isfile(CONFIG_FILE) then
-        local success, data = pcall(function()
-            return HttpService:JSONDecode(readfile(CONFIG_FILE))
-        end)
-        if success and data then
-            if data.position then
-                MainFrame.Position = UDim2.new(data.position.X[1], data.position.X[2], data.position.Y[1], data.position.Y[2])
-            end
-            if data.autoExecActive ~= nil then
-                setAutoExec(data.autoExecActive)
-            end
-            if data.hasStarted == true then
-                startFarming()
-            end
-        end
-    end
 end
 
 local remoteAction = ReplicatedStorage.Shared.Universe.Network.RemoteEvent.Actionable
@@ -184,6 +190,25 @@ local function pauseFarming()
     saveConfig()
 end
 
+function loadConfig()
+    if isfile(CONFIG_FILE) then
+        local success, data = pcall(function()
+            return HttpService:JSONDecode(readfile(CONFIG_FILE))
+        end)
+        if success and data then
+            if data.position then
+                MainFrame.Position = UDim2.new(data.position.X[1], data.position.X[2], data.position.Y[1], data.position.Y[2])
+            end
+            if data.autoExecActive ~= nil then
+                setAutoExec(data.autoExecActive)
+            end
+            if data.hasStarted == true then
+                startFarming()
+            end
+        end
+    end
+end
+
 ToggleBtn.MouseButton1Click:Connect(function()
     if isFinished then return end
     if not hasStarted then
@@ -202,6 +227,15 @@ local FARM_V2_START = 4000
 local FARM_V1_END = 2000
 
 task.spawn(function()
+    while true do
+        if hasStarted and not isPaused and not isFinished then
+            elapsedSeconds = elapsedSeconds + 1
+        end
+        task.wait(1)
+    end
+end)
+
+task.spawn(function()
     local overallStep = 0
     while true do
         local v1, v2, loop = FARM_V1_START, FARM_V2_START, 1
@@ -215,7 +249,11 @@ task.spawn(function()
                 end)
                 overallStep = overallStep + 1
                 local progress = overallStep / (3 * 2000)
-                ProgFill.Size = UDim2.new(math.clamp(progress, 0, 1), 0, 1, 0)
+                local contentSize = UDim2.new(math.clamp(progress, 0, 1), 0, 1, 0)
+                ProgFill.Size = contentSize
+                if NProgFill then
+                    NProgFill.Size = contentSize
+                end
                 v1 = v1 + 1
                 v2 = v2 - 1
                 if v1 > FARM_V1_END then
@@ -234,10 +272,14 @@ task.spawn(function()
                         isFinished = false
                         hasStarted = false
                         isPaused = false
+                        elapsedSeconds = 0
                         ToggleBtn.Text = "START"
                         ToggleBtn.BackgroundColor3 = Color3.fromRGB(0, 115, 230)
                         currentStatusBase = "IDLE"
                         ProgFill.Size = UDim2.new(0, 0, 1, 0)
+                        if NProgFill then
+                            NProgFill.Size = UDim2.new(0, 0, 1, 0)
+                        end
                         saveConfig()
                         startFarming()
                     end
@@ -254,12 +296,17 @@ task.spawn(function()
     while true do
         dotCount = dotCount % 3 + 1
         local dots = string.rep(".", dotCount)
-        StatusLabel.Text = currentStatusBase .. dots
+        local minutes = math.floor(elapsedSeconds / 60)
+        local seconds = elapsedSeconds % 60
+        local timeStr = string.format("%02d.%02d", minutes, seconds)
+        local totalTxt = timeStr .. " | " .. currentStatusBase .. dots
+        StatusLabel.Text = totalTxt
+        if NStatus then
+            NStatus.Text = totalTxt
+        end
         task.wait(0.5)
     end
 end)
-
-local autoExecFile = "NexusAutoExec_v2.txt"
 
 function setAutoExec(state)
     if state then
@@ -321,36 +368,81 @@ RunService.Heartbeat:Connect(function()
     end)
 end)
 
-local WindowName = "NexusHub_V2"
 local function CreateLogo()
     if CoreGui:FindFirstChild("NexusLogoGui") then
         CoreGui:FindFirstChild("NexusLogoGui"):Destroy()
     end
-    local ScreenGui = Instance.new("ScreenGui")
-    ScreenGui.Name = "NexusLogoGui"
-    ScreenGui.Parent = CoreGui
-    ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    ScreenGui.DisplayOrder = 10000
+    local LogoGui = Instance.new("ScreenGui")
+    LogoGui.Name = "NexusLogoGui"
+    LogoGui.Parent = CoreGui
+    LogoGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    LogoGui.DisplayOrder = 10000
 
     local LogoButton = Instance.new("ImageButton")
     LogoButton.Name = "Logo"
-    LogoButton.Parent = ScreenGui
-    LogoButton.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-    LogoButton.BackgroundTransparency = 0.5
-    LogoButton.Position = UDim2.new(0.1, 0, 0.1, 0)
-    LogoButton.Size = UDim2.new(0, 50, 0, 50)
+    LogoButton.Parent = LogoGui
+    LogoButton.BackgroundColor3 = Color3.fromRGB(12, 12, 16)
+    LogoButton.BackgroundTransparency = 0.2
+    LogoButton.Position = UDim2.new(0.05, 0, 0.1, 0)
+    LogoButton.Size = UDim2.new(0, 45, 0, 45)
     LogoButton.Active = true
     LogoButton.Draggable = true
 
     local UICorner = Instance.new("UICorner")
-    UICorner.CornerRadius = UDim.new(0, 12)
+    UICorner.CornerRadius = UDim.new(0, 10)
     UICorner.Parent = LogoButton
 
     local UIStroke = Instance.new("UIStroke")
     UIStroke.Parent = LogoButton
-    UIStroke.Color = Color3.fromRGB(255, 255, 255)
-    UIStroke.Thickness = 1
-    UIStroke.Transparency = 0.5
+    UIStroke.Color = Color3.fromRGB(50, 50, 60)
+    UIStroke.Thickness = 1.5
+
+    NotifyFrame = Instance.new("Frame")
+    NotifyFrame.Name = "NotifyFrame"
+    NotifyFrame.Parent = LogoGui
+    NotifyFrame.BackgroundColor3 = Color3.fromRGB(12, 12, 16)
+    NotifyFrame.Position = UDim2.new(0.05, 55, 0.1, 2)
+    NotifyFrame.Size = UDim2.new(0, 165, 0, 40)
+    NotifyFrame.ClipsDescendants = true
+    NotifyFrame.Visible = false
+    Instance.new("UICorner", NotifyFrame).CornerRadius = UDim.new(0, 8)
+    
+    local NStroke = Instance.new("UIStroke", NotifyFrame)
+    NStroke.Color = Color3.fromRGB(40, 40, 50)
+    NStroke.Thickness = 1.2
+
+    NStatus = Instance.new("TextLabel")
+    NStatus.Parent = NotifyFrame
+    NStatus.BackgroundTransparency = 1
+    NStatus.Position = UDim2.new(0, 10, 0, 6)
+    NStatus.Size = UDim2.new(1, -20, 0, 12)
+    NStatus.Font = Enum.Font.FredokaOne
+    NStatus.Text = "00.00 | IDLE"
+    NStatus.TextColor3 = Color3.fromRGB(240, 240, 240)
+    NStatus.TextSize = 9
+    NStatus.TextXAlignment = Enum.TextXAlignment.Left
+
+    local NProgBg = Instance.new("Frame")
+    NProgBg.Parent = NotifyFrame
+    NProgBg.BackgroundColor3 = Color3.fromRGB(22, 22, 26)
+    NProgBg.Position = UDim2.new(0, 10, 0, 24)
+    NProgBg.Size = UDim2.new(1, -20, 0, 5)
+    Instance.new("UICorner", NProgBg).CornerRadius = UDim.new(0, 4)
+
+    NProgFill = Instance.new("Frame")
+    NProgFill.Parent = NProgBg
+    NProgFill.BackgroundColor3 = Color3.fromRGB(0, 255, 130)
+    NProgFill.Size = UDim2.new(0, 0, 1, 0)
+    Instance.new("UICorner", NProgFill).CornerRadius = UDim.new(0, 4)
+
+    task.spawn(function()
+        while true do
+            if LogoButton and NotifyFrame then
+                NotifyFrame.Position = UDim2.new(LogoButton.Position.X.Scale, LogoButton.Position.X.Offset + 55, LogoButton.Position.Y.Scale, LogoButton.Position.Y.Offset + 2)
+            end
+            task.wait(0.01)
+        end
+    end)
 
     task.spawn(function()
         local ok, imgAsset = pcall(function()
@@ -372,6 +464,7 @@ local function CreateLogo()
         local gui = CoreGui:FindFirstChild(WindowName)
         if gui and gui:IsA("ScreenGui") then
             gui.Enabled = not gui.Enabled
+            NotifyFrame.Visible = not gui.Enabled
         end
     end)
 end
