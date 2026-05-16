@@ -327,6 +327,53 @@ task.spawn(function()
     end
 end)
 
+-- Vòng lặp chạy ngầm tự động hồi máu bằng Bandage khi tụt < 99% máu
+task.spawn(function()
+    while true do
+        pcall(function()
+            local char = lp.Character or lp.CharacterAdded:Wait()
+            local hum = char:WaitForChild("Humanoid", 3)
+            
+            if hum and hum.Health < 99 then
+                -- Lặp xử lý cho tới khi hồi đủ từ 100 máu trở lên
+                while hum and hum.Health < 100 do
+                    local objectModels = workspace:FindFirstChild("ObjectModels")
+                    if objectModels then
+                        -- Quét tìm bandage trong ObjectModels
+                        for _, obj in pairs(objectModels:GetChildren()) do
+                            if obj.Name == "bandage" and obj:FindFirstChild("serverEntity") then
+                                local entityId = obj.serverEntity.Value
+                                
+                                -- Gửi tín hiệu lấy/mua bandage
+                                remoteStore:FireServer(entityId)
+                                task.wait(0.2)
+                                
+                                -- Kiểm tra xem đã có Bandage trong Backpack chưa
+                                local bandageInBackpack = lp.Backpack:FindFirstChild("Bandage")
+                                if bandageInBackpack then
+                                    -- Trang bị (Equip) Bandage lên tay
+                                    hum:EquipTool(bandageInBackpack)
+                                    task.wait(0.1)
+                                    
+                                    -- Kích hoạt sử dụng Bandage
+                                    local charBandage = char:FindFirstChild("Bandage")
+                                    if charBandage and charBandage:FindFirstChild("Use") then
+                                        charBandage.Use:FireServer()
+                                    end
+                                    task.wait(0.5) -- Đợi xử lý hồi máu
+                                    break -- Thoát vòng lặp for để quét lại máu mới
+                                end
+                            end
+                        end
+                    end
+                    task.wait(0.3) -- Giãn cách quét lại nếu chưa đạt 100 máu
+                end
+            end
+        end)
+        task.wait(0.5) -- Chu kỳ kiểm tra máu tổng thể
+    end
+end)
+
 function setAutoExec(state)
     if state then
         autoExecActive = true
