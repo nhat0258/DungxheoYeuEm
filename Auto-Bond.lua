@@ -1,59 +1,59 @@
+if game:GetService("CoreGui"):FindFirstChild("NexusHub") then return end
+
 local CoreGui = game:GetService("CoreGui")
 local UserInputService = game:GetService("UserInputService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
 local HttpService = game:GetService("HttpService")
+local Workspace = game:GetService("Workspace")
+local PlaceId = game.PlaceId
 
 local lp = Players.LocalPlayer
 local pGui = lp:WaitForChild("PlayerGui")
 
 local isPaused = false
 local isFinished = false
-local autoExecActive = false
+local autoToggleActive = false
 local hasStarted = false
 local configLoaded = false
 local currentStatusBase = "IDLE"
-local CONFIG_FILE = "NexusDeadRailsBond.json"
-local autoExecFile = "NexusAutoExec_v2.txt"
-local WindowName = "NexusHub_V2"
 local healPickupCooldown = false
 
-local NotifyFrame
-local NStatus
-local NProgFill
+local FOLDER_NAME = "Nexus Hub Dead Rails"
+local CONFIG_PATH = FOLDER_NAME .. "/NexusHubConfig.json"
+local WindowName = "NexusHub"
+
+local NotifyFrame, NStatus, NProgFill
 local elapsedSeconds = 0
 
-local queue_on_teleport = queue_on_teleport or (syn and syn.queue_on_teleport) or (fluxus and fluxus.queue_on_teleport)
-if queue_on_teleport then
-    local teleportScript = [[
-        repeat task.wait() until game:IsLoaded()
-        pcall(function()
-            loadstring(game:HttpGet("https://raw.githubusercontent.com/nhat0258/DungxheoYeuEm/refs/heads/main/Auto-Bond.lua"))()
-        end)
-    ]]
-    queue_on_teleport(teleportScript)
-    lp.OnTeleport:Connect(function(state)
-        if state == Enum.TeleportState.Started then
-            queue_on_teleport(teleportScript)
-        end
-    end)
+local function createFolder()
+    if not isfolder(FOLDER_NAME) then
+        makefolder(FOLDER_NAME)
+    end
 end
+createFolder()
 
-if CoreGui:FindFirstChild(WindowName) then
-    CoreGui[WindowName]:Destroy()
-end
+local remoteAction = ReplicatedStorage.Shared.Universe.Network.RemoteEvent.Actionable
+local remoteParty = ReplicatedStorage.Shared.Universe.Network.RemoteEvent.CreateParty
+local remotePickup = ReplicatedStorage.Shared.Universe.Network.RemoteEvent.Pickup
 
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = WindowName
 ScreenGui.Parent = CoreGui
 
+local MainFrameHeight = 135
+local isLobby = (PlaceId == 70876832253163)
+if isLobby then
+    MainFrameHeight = 70
+end
+
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
 MainFrame.Parent = ScreenGui
 MainFrame.BackgroundColor3 = Color3.fromRGB(12, 12, 16)
-MainFrame.Position = UDim2.new(0.5, -85, 0.5, -67)
-MainFrame.Size = UDim2.new(0, 170, 0, 135)
+MainFrame.Position = UDim2.new(0.5, -85, 0.5, -MainFrameHeight/2)
+MainFrame.Size = UDim2.new(0, 170, 0, MainFrameHeight)
 MainFrame.ClipsDescendants = true
 Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
 
@@ -62,7 +62,6 @@ Stroke.Color = Color3.fromRGB(50, 50, 60)
 Stroke.Thickness = 1.5
 
 local TopBar = Instance.new("Frame")
-TopBar.Name = "TopBar"
 TopBar.Parent = MainFrame
 TopBar.BackgroundTransparency = 1
 TopBar.Size = UDim2.new(1, 0, 0, 30)
@@ -89,46 +88,67 @@ Subtitle.TextColor3 = Color3.fromRGB(180, 180, 180)
 Subtitle.TextSize = 8
 Subtitle.TextXAlignment = Enum.TextXAlignment.Left
 
-local StatusLabel = Instance.new("TextLabel")
-StatusLabel.Parent = MainFrame
-StatusLabel.BackgroundTransparency = 1
-StatusLabel.Position = UDim2.new(0, 10, 0, 30)
-StatusLabel.Size = UDim2.new(1, -20, 0, 12)
-StatusLabel.Font = Enum.Font.FredokaOne
-StatusLabel.Text = "00m:00s | IDLE"
-StatusLabel.TextColor3 = Color3.fromRGB(140, 140, 140)
-StatusLabel.TextSize = 9
-StatusLabel.TextXAlignment = Enum.TextXAlignment.Center
+local StatusLabel
+local ProgBg, ProgFill
+local ToggleBtn
 
-local ProgBg = Instance.new("Frame")
-ProgBg.Parent = MainFrame
-ProgBg.BackgroundColor3 = Color3.fromRGB(22, 22, 26)
-ProgBg.Position = UDim2.new(0, 10, 0, 44)
-ProgBg.Size = UDim2.new(1, -20, 0, 6)
-Instance.new("UICorner", ProgBg).CornerRadius = UDim.new(0, 8)
+if not isLobby then
+    StatusLabel = Instance.new("TextLabel")
+    StatusLabel.Parent = MainFrame
+    StatusLabel.BackgroundTransparency = 1
+    StatusLabel.Position = UDim2.new(0, 10, 0, 30)
+    StatusLabel.Size = UDim2.new(1, -20, 0, 12)
+    StatusLabel.Font = Enum.Font.FredokaOne
+    StatusLabel.Text = "00m:00s | IDLE"
+    StatusLabel.TextColor3 = Color3.fromRGB(140, 140, 140)
+    StatusLabel.TextSize = 9
+    StatusLabel.TextXAlignment = Enum.TextXAlignment.Center
 
-local ProgFill = Instance.new("Frame")
-ProgFill.Parent = ProgBg
-ProgFill.BackgroundColor3 = Color3.fromRGB(0, 255, 130)
-ProgFill.Size = UDim2.new(0, 0, 1, 0)
-Instance.new("UICorner", ProgFill).CornerRadius = UDim.new(0, 8)
+    ProgBg = Instance.new("Frame")
+    ProgBg.Parent = MainFrame
+    ProgBg.BackgroundColor3 = Color3.fromRGB(22, 22, 26)
+    ProgBg.Position = UDim2.new(0, 10, 0, 44)
+    ProgBg.Size = UDim2.new(1, -20, 0, 6)
+    Instance.new("UICorner", ProgBg).CornerRadius = UDim.new(0, 8)
 
-local function btn(txt, pos, clr)
-    local t = Instance.new("TextButton")
-    t.Parent = MainFrame
-    t.BackgroundColor3 = clr
-    t.Position = pos
-    t.Size = UDim2.new(1, -20, 0, 30)
-    t.Font = Enum.Font.FredokaOne
-    t.Text = txt
-    t.TextColor3 = Color3.fromRGB(255, 255, 255)
-    t.TextSize = 9
-    Instance.new("UICorner", t).CornerRadius = UDim.new(0, 6)
-    return t
+    ProgFill = Instance.new("Frame")
+    ProgFill.Parent = ProgBg
+    ProgFill.BackgroundColor3 = Color3.fromRGB(0, 255, 130)
+    ProgFill.Size = UDim2.new(0, 0, 1, 0)
+    Instance.new("UICorner", ProgFill).CornerRadius = UDim.new(0, 8)
+
+    ToggleBtn = Instance.new("TextButton")
+    ToggleBtn.Parent = MainFrame
+    ToggleBtn.BackgroundColor3 = Color3.fromRGB(0, 115, 230)
+    ToggleBtn.Position = UDim2.new(0, 10, 0, 56)
+    ToggleBtn.Size = UDim2.new(1, -20, 0, 30)
+    ToggleBtn.Font = Enum.Font.FredokaOne
+    ToggleBtn.Text = "Start Farm Bond"
+    ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    ToggleBtn.TextSize = 9
+    Instance.new("UICorner", ToggleBtn).CornerRadius = UDim.new(0, 6)
 end
 
-local ToggleBtn = btn("START FARM BOND", UDim2.new(0, 10, 0, 56), Color3.fromRGB(0, 115, 230))
-local AutoExecBtn = btn("AUTO EXEC: OFF", UDim2.new(0, 10, 0, 94), Color3.fromRGB(28, 28, 33))
+local autoBtnText = "Auto Play Again: Off"
+local autoBtnAction = "replay"
+if isLobby then
+    autoBtnText = "Auto Start Game: Off"
+    autoBtnAction = "startgame"
+elseif PlaceId == 116495829188952 then
+    autoBtnText = "Auto Play Again: Off"
+    autoBtnAction = "replay"
+end
+
+local AutoBtn = Instance.new("TextButton")
+AutoBtn.Parent = MainFrame
+AutoBtn.BackgroundColor3 = Color3.fromRGB(28, 28, 33)
+AutoBtn.Position = isLobby and UDim2.new(0, 10, 0, 34) or UDim2.new(0, 10, 0, 94)
+AutoBtn.Size = UDim2.new(1, -20, 0, 30)
+AutoBtn.Font = Enum.Font.FredokaOne
+AutoBtn.Text = autoBtnText
+AutoBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+AutoBtn.TextSize = 9
+Instance.new("UICorner", AutoBtn).CornerRadius = UDim.new(0, 6)
 
 local dragging, dStart, sPos = false, nil, nil
 
@@ -149,71 +169,66 @@ end)
 
 UserInputService.InputEnded:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        if dragging then
-            dragging = false
-        end
+        if dragging then dragging = false end
     end
 end)
-
-task.spawn(function()
-    while true do
-        if configLoaded then
-            pcall(function()
-                local config = {
-                    position = {
-                        X = {MainFrame.Position.X.Scale, MainFrame.Position.X.Offset},
-                        Y = {MainFrame.Position.Y.Scale, MainFrame.Position.Y.Offset}
-                    },
-                    autoExecActive = autoExecActive,
-                    hasStarted = hasStarted,
-                    isPaused = isPaused,
-                    guiEnabled = ScreenGui.Enabled
-                }
-                writefile(CONFIG_FILE, HttpService:JSONEncode(config))
-            end)
-        end
-        task.wait(0.1)
-    end
-end)
-
-local remoteAction = ReplicatedStorage.Shared.Universe.Network.RemoteEvent.Actionable
-local remoteStore = ReplicatedStorage.Shared.Universe.Network.RemoteEvent.Store
-local remoteParty = ReplicatedStorage.Shared.Universe.Network.RemoteEvent.CreateParty
 
 local function startFarming()
-    if isFinished then return end
+    if isFinished or isLobby then return end
     isPaused = false
     hasStarted = true
-    ToggleBtn.Text = "PAUSE FARM"
-    ToggleBtn.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
+    if ToggleBtn then
+        ToggleBtn.Text = "Pause Farm"
+        ToggleBtn.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
+    end
     currentStatusBase = "Bond Collecting"
 end
 
 local function pauseFarming()
     isPaused = true
-    ToggleBtn.Text = "CONTINUE FARM"
-    ToggleBtn.BackgroundColor3 = Color3.fromRGB(0, 115, 230)
+    if ToggleBtn then
+        ToggleBtn.Text = "Continue Farm"
+        ToggleBtn.BackgroundColor3 = Color3.fromRGB(0, 115, 230)
+    end
     currentStatusBase = "Temporarily Suspended"
 end
 
-function loadConfig()
-    if isfile(CONFIG_FILE) then
+local function saveConfig()
+    pcall(function()
+        local config = {
+            position = {
+                X = {MainFrame.Position.X.Scale, MainFrame.Position.X.Offset},
+                Y = {MainFrame.Position.Y.Scale, MainFrame.Position.Y.Offset}
+            },
+            autoToggleActive = autoToggleActive,
+            hasStarted = hasStarted,
+            isPaused = isPaused,
+            guiEnabled = ScreenGui.Enabled
+        }
+        writefile(CONFIG_PATH, HttpService:JSONEncode(config))
+    end)
+end
+
+local function loadConfig()
+    if isfile(CONFIG_PATH) then
         local success, data = pcall(function()
-            return HttpService:JSONDecode(readfile(CONFIG_FILE))
+            return HttpService:JSONDecode(readfile(CONFIG_PATH))
         end)
         if success and data then
             if data.position then
                 MainFrame.Position = UDim2.new(data.position.X[1], data.position.X[2], data.position.Y[1], data.position.Y[2])
             end
-            if data.autoExecActive ~= nil then
-                setAutoExec(data.autoExecActive)
+            if data.autoToggleActive ~= nil then
+                setAutoToggle(data.autoToggleActive)
             end
-            if data.hasStarted == true then
+            if data.hasStarted == true and not isLobby then
                 if data.isPaused == true then
                     isPaused = true
                     hasStarted = true
-                    ToggleBtn.Text = "CONTINUE FARM"
-                    ToggleBtn.BackgroundColor3 = Color3.fromRGB(0, 115, 230)
+                    if ToggleBtn then
+                        ToggleBtn.Text = "Continue Farm"
+                        ToggleBtn.BackgroundColor3 = Color3.fromRGB(0, 115, 230)
+                    end
                     currentStatusBase = "Temporarily Suspended"
                 else
                     startFarming()
@@ -230,18 +245,21 @@ function loadConfig()
     configLoaded = true
 end
 
-ToggleBtn.MouseButton1Click:Connect(function()
-    if isFinished then return end
-    if not hasStarted then
-        startFarming()
-    else
-        if isPaused then
+if ToggleBtn then
+    ToggleBtn.MouseButton1Click:Connect(function()
+        if isFinished or isLobby then return end
+        if not hasStarted then
             startFarming()
         else
-            pauseFarming()
+            if isPaused then
+                startFarming()
+            else
+                pauseFarming()
+            end
         end
-    end
-end)
+        saveConfig()
+    end)
+end
 
 local FARM_V1_START = 1
 local FARM_V2_START = 4000
@@ -249,7 +267,7 @@ local FARM_V1_END = 2000
 
 task.spawn(function()
     while true do
-        if hasStarted and not isPaused and not isFinished then
+        if hasStarted and not isPaused and not isFinished and not isLobby then
             elapsedSeconds = elapsedSeconds + 1
         end
         task.wait(1)
@@ -263,7 +281,7 @@ task.spawn(function()
         overallStep = 0
         while not hasStarted do task.wait(0.1) end
         while hasStarted do
-            if not isPaused and not isFinished then
+            if not isPaused and not isFinished and not isLobby then
                 if not healPickupCooldown then
                     pcall(function()
                         remoteAction:FireServer(v1)
@@ -271,10 +289,11 @@ task.spawn(function()
                     end)
                     overallStep = overallStep + 1
                     local progress = overallStep / (3 * 2000)
-                    local contentSize = UDim2.new(math.clamp(progress, 0, 1), 0, 1, 0)
-                    ProgFill.Size = contentSize
+                    if ProgFill then
+                        ProgFill.Size = UDim2.new(math.clamp(progress, 0, 1), 0, 1, 0)
+                    end
                     if NProgFill then
-                        NProgFill.Size = contentSize
+                        NProgFill.Size = ProgFill and ProgFill.Size or UDim2.new(0,0,1,0)
                     end
                     v1 = v1 + 1
                     v2 = v2 - 1
@@ -287,22 +306,28 @@ task.spawn(function()
                             currentStatusBase = "Play Again"
                             pcall(function() lp.Character.Humanoid.Health = 0 end)
                             task.wait(11)
-                            repeat
-                                pcall(function() ReplicatedStorage.Remotes.EndDecision:FireServer(false) end)
-                                task.wait(1)
-                            until lp.Character and lp.Character:FindFirstChild("Humanoid") and lp.Character.Humanoid.Health > 0
+                            if PlaceId == 116495829188952 then
+                                repeat
+                                    pcall(function() ReplicatedStorage.Remotes.EndDecision:FireServer(false) end)
+                                    task.wait(1)
+                                until lp.Character and lp.Character:FindFirstChild("Humanoid") and lp.Character.Humanoid.Health > 0
+                            end
                             isFinished = false
                             hasStarted = false
                             isPaused = false
                             elapsedSeconds = 0
-                            ToggleBtn.Text = "START FARM BOND"
-                            ToggleBtn.BackgroundColor3 = Color3.fromRGB(0, 115, 230)
-                            currentStatusBase = "IDLE"
-                            ProgFill.Size = UDim2.new(0, 0, 1, 0)
-                            if NProgFill then
-                                NProgFill.Size = UDim2.new(0, 0, 1, 0)
+                            if ToggleBtn then
+                                ToggleBtn.Text = "Start Farm Bond"
+                                ToggleBtn.BackgroundColor3 = Color3.fromRGB(0, 115, 230)
                             end
-                            startFarming()
+                            currentStatusBase = "IDLE"
+                            if ProgFill then ProgFill.Size = UDim2.new(0, 0, 1, 0) end
+                            if NProgFill then NProgFill.Size = UDim2.new(0, 0, 1, 0) end
+                            if autoToggleActive and not isLobby then
+                                startFarming()
+                            else
+                                saveConfig()
+                            end
                         end
                     end
                 end
@@ -322,7 +347,9 @@ task.spawn(function()
         local seconds = elapsedSeconds % 60
         local timeStr = string.format("%02dm:%02ds", minutes, seconds)
         local totalTxt = timeStr .. " | " .. currentStatusBase .. dots
-        StatusLabel.Text = totalTxt
+        if StatusLabel then
+            StatusLabel.Text = totalTxt
+        end
         if NStatus then
             NStatus.Text = totalTxt
         end
@@ -330,62 +357,68 @@ task.spawn(function()
     end
 end)
 
-function setAutoExec(state)
-    if state then
-        autoExecActive = true
-        AutoExecBtn.Text = "AUTO EXEC: ON"
-        AutoExecBtn.BackgroundColor3 = Color3.fromRGB(0, 160, 80)
-        pcall(function() writefile(autoExecFile, "1") end)
-        task.spawn(function()
-            while autoExecActive do
-                for i = 0, 4 do
-                    local n = i == 0 and "PartyZone" or "PartyZone" .. i
-                    local partyZones = workspace:FindFirstChild("PartyZones")
-                    if partyZones then
-                        local z = partyZones:FindFirstChild(n)
-                        if z and z:FindFirstChild("Hitbox") then
-                            pcall(function()
-                                firetouchinterest(lp.Character.HumanoidRootPart, z.Hitbox, 0)
-                                firetouchinterest(lp.Character.HumanoidRootPart, z.Hitbox, 1)
-                            end)
+function setAutoToggle(state)
+    autoToggleActive = state
+    if autoBtnAction == "startgame" then
+        if state then
+            AutoBtn.Text = "Auto Start Game: On"
+            AutoBtn.BackgroundColor3 = Color3.fromRGB(0, 160, 80)
+            task.spawn(function()
+                while autoToggleActive and isLobby do
+                    for i = 0, 4 do
+                        local n = i == 0 and "PartyZone" or "PartyZone" .. i
+                        local partyZones = Workspace:FindFirstChild("PartyZones")
+                        if partyZones then
+                            local z = partyZones:FindFirstChild(n)
+                            if z and z:FindFirstChild("Hitbox") then
+                                pcall(function()
+                                    firetouchinterest(lp.Character.HumanoidRootPart, z.Hitbox, 0)
+                                    firetouchinterest(lp.Character.HumanoidRootPart, z.Hitbox, 1)
+                                end)
+                            end
                         end
                     end
+                    task.wait(0.3)
                 end
-                task.wait(0.3)
-            end
-        end)
-        task.spawn(function()
-            while autoExecActive do
-                pcall(function()
-                    remoteParty:FireServer({
-                        ["isPrivate"] = false,
-                        ["trainId"] = "default",
-                        ["maxMembers"] = 1,
-                        ["gameMode"] = "Nightmare"
-                    })
-                end)
-                task.wait(1)
-            end
-        end)
-    else
-        autoExecActive = false
-        AutoExecBtn.Text = "AUTO EXEC: OFF"
-        AutoExecBtn.BackgroundColor3 = Color3.fromRGB(28, 28, 33)
-        pcall(function() delfile(autoExecFile) end)
+            end)
+            task.spawn(function()
+                while autoToggleActive and isLobby do
+                    pcall(function()
+                        remoteParty:FireServer({
+                            ["isPrivate"] = false,
+                            ["trainId"] = "default",
+                            ["maxMembers"] = 1,
+                            ["gameMode"] = "Nightmare"
+                        })
+                    end)
+                    task.wait(1)
+                end
+            end)
+        else
+            AutoBtn.Text = "Auto Start Game: Off"
+            AutoBtn.BackgroundColor3 = Color3.fromRGB(28, 28, 33)
+        end
+    elseif autoBtnAction == "replay" then
+        if state then
+            AutoBtn.Text = "Auto Play Again: On"
+            AutoBtn.BackgroundColor3 = Color3.fromRGB(0, 160, 80)
+        else
+            AutoBtn.Text = "Auto Play Again: Off"
+            AutoBtn.BackgroundColor3 = Color3.fromRGB(28, 28, 33)
+        end
     end
+    saveConfig()
 end
 
-AutoExecBtn.MouseButton1Click:Connect(function()
-    setAutoExec(not autoExecActive)
+AutoBtn.MouseButton1Click:Connect(function()
+    setAutoToggle(not autoToggleActive)
 end)
-
-if isfile(autoExecFile) then
-    setAutoExec(true)
-end
 
 RunService.Heartbeat:Connect(function()
     pcall(function()
-        pGui.BondGui.BondInfo.Position = UDim2.new(0.01, 0, 0.593, 0)
+        if pGui:FindFirstChild("BondGui") and pGui.BondGui:FindFirstChild("BondInfo") then
+            pGui.BondGui.BondInfo.Position = UDim2.new(0.01, 0, 0.593, 0)
+        end
     end)
 end)
 
@@ -409,14 +442,9 @@ local function CreateLogo()
     LogoButton.Active = true
     LogoButton.Draggable = true
 
-    local UICorner = Instance.new("UICorner")
-    UICorner.CornerRadius = UDim.new(0, 10)
-    UICorner.Parent = LogoButton
-
-    local UIStroke = Instance.new("UIStroke")
-    UIStroke.Parent = LogoButton
-    UIStroke.Color = Color3.fromRGB(50, 50, 60)
-    UIStroke.Thickness = 1.5
+    Instance.new("UICorner", LogoButton).CornerRadius = UDim.new(0, 10)
+    Instance.new("UIStroke", LogoButton).Color = Color3.fromRGB(50, 50, 60)
+    Instance.new("UIStroke", LogoButton).Thickness = 1.5
 
     NotifyFrame = Instance.new("Frame")
     NotifyFrame.Name = "NotifyFrame"
@@ -427,10 +455,8 @@ local function CreateLogo()
     NotifyFrame.ClipsDescendants = true
     NotifyFrame.Visible = false
     Instance.new("UICorner", NotifyFrame).CornerRadius = UDim.new(0, 8)
-    
-    local NStroke = Instance.new("UIStroke", NotifyFrame)
-    NStroke.Color = Color3.fromRGB(40, 40, 50)
-    NStroke.Thickness = 1.2
+    Instance.new("UIStroke", NotifyFrame).Color = Color3.fromRGB(40, 40, 50)
+    Instance.new("UIStroke", NotifyFrame).Thickness = 1.2
 
     NStatus = Instance.new("TextLabel")
     NStatus.Parent = NotifyFrame
@@ -486,61 +512,82 @@ local function CreateLogo()
         if gui and gui:IsA("ScreenGui") then
             gui.Enabled = not gui.Enabled
             NotifyFrame.Visible = not gui.Enabled
+            saveConfig()
         end
     end)
 end
 
 task.spawn(function()
-    while true do
-        if hasStarted and not isFinished then
-            local character = lp.Character
-            if character and character:FindFirstChild("Humanoid") then
-                local humanoid = character.Humanoid
-                local maxHealth = humanoid.MaxHealth
-                if humanoid.Health < maxHealth then
-                    local backpack = lp.Backpack
-                    local bandageTool = backpack:FindFirstChild("Bandage")
-                    if bandageTool then
-                        if not character:FindFirstChild("Bandage") then
-                            humanoid:EquipTool(bandageTool)
+    while task.wait(0.1) do
+        if not (hasStarted and not isFinished and not isLobby) then continue end
+        local character = lp.Character
+        if not character then continue end
+        local humanoid = character:FindFirstChild("Humanoid")
+        if not humanoid or humanoid.Health <= 0 then continue end
+        local backpack = lp:FindFirstChild("Backpack")
+        if not backpack then continue end
+
+        local bandageCount = 0
+        local firstBandage = nil
+        local equippedBandage = character:FindFirstChild("Bandage")
+
+        for _, item in ipairs(backpack:GetChildren()) do
+            if string.lower(item.Name) == "bandage" then
+                bandageCount = bandageCount + 1
+                if not firstBandage then firstBandage = item end
+            end
+        end
+        if equippedBandage then
+            bandageCount = bandageCount + 1
+        end
+
+        if bandageCount < 20 then
+            local objectModels = Workspace:FindFirstChild("ObjectModels")
+            if objectModels then
+                for _, item in ipairs(objectModels:GetChildren()) do
+                    if string.lower(item.Name) == "bandage" then
+                        local serverEntity = nil
+                        if item:FindFirstChild("serverEntity") then
+                            serverEntity = item.serverEntity.Value
+                        else
+                            serverEntity = item:GetAttribute("serverEntity") or item:GetAttribute("entity_server")
                         end
-                        while humanoid.Health < maxHealth do
-                            local charBandage = character:FindFirstChild("Bandage")
-                            if charBandage then
-                                pcall(function()
-                                    charBandage.Use:FireServer()
-                                end)
-                            else
-                                break
-                            end
-                            task.wait(0.3)
-                        end
-                    else
-                        local objectModels = workspace:FindFirstChild("ObjectModels")
-                        if objectModels then
-                            local validBandage = nil
-                            local serverEntityValue = nil
-                            for _, child in ipairs(objectModels:GetChildren()) do
-                                if child.Name == "bandage" and child:FindFirstChild("serverEntity") then
-                                    validBandage = child
-                                    serverEntityValue = child.serverEntity.Value
-                                    break
-                                end
-                            end
-                            if validBandage and serverEntityValue then
-                                healPickupCooldown = true
-                                pcall(function()
-                                    remoteStore:FireServer(serverEntityValue)
-                                end)
-                                task.wait(0.5)
-                                healPickupCooldown = false
-                            end
+                        if serverEntity then
+                            healPickupCooldown = true
+                            task.wait(0.075)
+                            pcall(function()
+                                remotePickup:FireServer(tonumber(serverEntity) or serverEntity)
+                            end)
+                            task.wait(0.05)
+                            healPickupCooldown = false
+                            break
                         end
                     end
                 end
             end
         end
-        task.wait(1)
+
+        if humanoid.Health < 100 then
+            if equippedBandage then
+                local useEvent = equippedBandage:FindFirstChild("Use")
+                if useEvent then
+                    pcall(function()
+                        useEvent:FireServer()
+                    end)
+                end
+            elseif firstBandage then
+                humanoid:EquipTool(firstBandage)
+            end
+        end
+    end
+end)
+
+task.spawn(function()
+    while true do
+        if configLoaded then
+            saveConfig()
+        end
+        task.wait(0.5)
     end
 end)
 
