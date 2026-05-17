@@ -76,6 +76,7 @@ Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
 local Stroke = Instance.new("UIStroke", MainFrame)
 Stroke.Color = Color3.fromRGB(255, 255, 255)
 Stroke.Thickness = 1
+Stroke.Transparency = 0.5
 
 local TopBar = Instance.new("Frame")
 TopBar.Parent = MainFrame
@@ -125,8 +126,8 @@ if isLobby then
     LobbyProgBg.Parent = MainFrame
     LobbyProgBg.BackgroundColor3 = Color3.fromRGB(22, 22, 26)
     LobbyProgBg.Position = UDim2.new(0, 10, 0, 46)
-    LobbyProgBg.Size = UDim2.new(1, -20, 0, 8)
-    Instance.new("UICorner", LobbyProgBg).CornerRadius = UDim.new(0, 6)
+    LobbyProgBg.Size = UDim2.new(1, -20, 0, 6)
+    Instance.new("UICorner", LobbyProgBg).CornerRadius = UDim.new(0, 8)
 
     LobbyProgFill = Instance.new("Frame")
     LobbyProgFill.Name = "LobbyFill"
@@ -134,7 +135,7 @@ if isLobby then
     LobbyProgFill.BackgroundColor3 = Color3.fromRGB(0, 255, 130)
     LobbyProgFill.Size = UDim2.new(0, 0, 1, 0)
     LobbyProgFill.ClipsDescendants = true
-    Instance.new("UICorner", LobbyProgFill).CornerRadius = UDim.new(0, 6)
+    Instance.new("UICorner", LobbyProgFill).CornerRadius = UDim.new(0, 8)
 
     local shinyLobby = Instance.new("ImageLabel")
     shinyLobby.Name = "Shiny"
@@ -245,12 +246,17 @@ end)
 local function startFarming()
     if isFinished or isLobby then return end
     isPaused = false
-    hasStarted = true
     if ToggleBtn then
         ToggleBtn.Text = "Pause Farm"
         ToggleBtn.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
     end
     currentStatusBase = "Bond Collecting"
+    task.spawn(function()
+        while not (lp.Character and lp.Character:FindFirstChild("Humanoid") and lp.Character.Humanoid.Health > 0) do
+            task.wait(0.2)
+        end
+        hasStarted = true
+    end)
 end
 
 local function pauseFarming()
@@ -436,21 +442,24 @@ task.spawn(function()
         if StatusLabel then
             StatusLabel.Text = totalTxt
         end
-        if NStatus then
-            NStatus.Text = totalTxt
-        end
-        if isLobby and LobbyStatus and autoToggleActive then
+        if isLobby and autoToggleActive then
             local lobbyState = "Idle"
-            if autoToggleActive then
-                if LobbyProgFill and LobbyProgFill.Size.X.Scale < 0.34 then
+            if LobbyProgFill then
+                if LobbyProgFill.Size.X.Scale < 0.34 then
                     lobbyState = "Creating a Party" .. dots
-                elseif LobbyProgFill and LobbyProgFill.Size.X.Scale < 0.67 then
+                elseif LobbyProgFill.Size.X.Scale < 0.67 then
                     lobbyState = "Creating a Party" .. dots
                 else
                     lobbyState = "Waiting To Join The Game" .. dots
                 end
             end
-            LobbyStatus.Text = lobbyState
+            if LobbyStatus then LobbyStatus.Text = lobbyState end
+            if NStatus then NStatus.Text = lobbyState end
+            if NProgFill and LobbyProgFill then
+                NProgFill.Size = LobbyProgFill.Size
+            end
+        else
+            if NStatus then NStatus.Text = totalTxt end
         end
         task.wait(0.5)
     end
@@ -614,6 +623,7 @@ local function CreateLogo()
     local logoStroke = Instance.new("UIStroke", LogoButton)
     logoStroke.Color = Color3.fromRGB(255, 255, 255)
     logoStroke.Thickness = 1
+    logoStroke.Transparency = 0.5
 
     NotifyFrame = Instance.new("Frame")
     NotifyFrame.Name = "NotifyFrame"
@@ -627,6 +637,7 @@ local function CreateLogo()
     local notifyStroke = Instance.new("UIStroke", NotifyFrame)
     notifyStroke.Color = Color3.fromRGB(255, 255, 255)
     notifyStroke.Thickness = 1
+    notifyStroke.Transparency = 0.5
 
     NStatus = Instance.new("TextLabel")
     NStatus.Parent = NotifyFrame
