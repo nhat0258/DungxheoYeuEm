@@ -73,10 +73,11 @@ MainFrame.Size = UDim2.new(0, 170, 0, MainFrameHeight)
 MainFrame.ClipsDescendants = true
 Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
 
+-- Replace old dark stroke with thin white stroke, Transparency = 0.5
 local Stroke = Instance.new("UIStroke", MainFrame)
 Stroke.Color = Color3.fromRGB(255, 255, 255)
-Stroke.Thickness = 1
 Stroke.Transparency = 0.5
+Stroke.Thickness = 1.2
 
 local TopBar = Instance.new("Frame")
 TopBar.Parent = MainFrame
@@ -126,8 +127,8 @@ if isLobby then
     LobbyProgBg.Parent = MainFrame
     LobbyProgBg.BackgroundColor3 = Color3.fromRGB(22, 22, 26)
     LobbyProgBg.Position = UDim2.new(0, 10, 0, 46)
-    LobbyProgBg.Size = UDim2.new(1, -20, 0, 6)
-    Instance.new("UICorner", LobbyProgBg).CornerRadius = UDim.new(0, 8)
+    LobbyProgBg.Size = UDim2.new(1, -20, 0, 8)
+    Instance.new("UICorner", LobbyProgBg).CornerRadius = UDim.new(0, 6)
 
     LobbyProgFill = Instance.new("Frame")
     LobbyProgFill.Name = "LobbyFill"
@@ -135,7 +136,7 @@ if isLobby then
     LobbyProgFill.BackgroundColor3 = Color3.fromRGB(0, 255, 130)
     LobbyProgFill.Size = UDim2.new(0, 0, 1, 0)
     LobbyProgFill.ClipsDescendants = true
-    Instance.new("UICorner", LobbyProgFill).CornerRadius = UDim.new(0, 8)
+    Instance.new("UICorner", LobbyProgFill).CornerRadius = UDim.new(0, 6)
 
     local shinyLobby = Instance.new("ImageLabel")
     shinyLobby.Name = "Shiny"
@@ -246,17 +247,12 @@ end)
 local function startFarming()
     if isFinished or isLobby then return end
     isPaused = false
+    hasStarted = true
     if ToggleBtn then
         ToggleBtn.Text = "Pause Farm"
         ToggleBtn.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
     end
     currentStatusBase = "Bond Collecting"
-    task.spawn(function()
-        while not (lp.Character and lp.Character:FindFirstChild("Humanoid") and lp.Character.Humanoid.Health > 0) do
-            task.wait(0.2)
-        end
-        hasStarted = true
-    end)
 end
 
 local function pauseFarming()
@@ -340,47 +336,6 @@ local FARM_V1_START = 800
 local FARM_V2_START = 4000
 local FARM_V1_END = 2000
 
-local function resetAfterFinish()
-    isFinished = false
-    isPaused = false
-    elapsedSeconds = 0
-    currentStatusBase = "Idle"
-    if ToggleBtn then
-        ToggleBtn.Text = "Start Farm Bond"
-        ToggleBtn.BackgroundColor3 = Color3.fromRGB(0, 115, 230)
-    end
-    if ProgFill then ProgFill.Size = UDim2.new(0, 0, 1, 0) end
-    if NProgFill then NProgFill.Size = UDim2.new(0, 0, 1, 0) end
-    if autoToggleActive and not isLobby then
-        startFarming()
-    else
-        saveConfig()
-    end
-end
-
-local function handlePlayAgain()
-    if isLobby then return end
-    isFinished = true
-    hasStarted = false
-    isPaused = false
-    currentStatusBase = "Play Again"
-    if ToggleBtn then
-        ToggleBtn.Text = "Start Farm Bond"
-        ToggleBtn.BackgroundColor3 = Color3.fromRGB(0, 115, 230)
-    end
-    if ProgFill then ProgFill.Size = UDim2.new(0, 0, 1, 0) end
-    if NProgFill then NProgFill.Size = UDim2.new(0, 0, 1, 0) end
-
-    task.wait(11)
-    if PlaceId == 70876832253163 then
-        repeat
-            pcall(function() ReplicatedStorage.Remotes.EndDecision:FireServer(false) end)
-            task.wait(1)
-        until lp.Character and lp.Character:FindFirstChild("Humanoid") and lp.Character.Humanoid.Health > 0
-    end
-    resetAfterFinish()
-end
-
 task.spawn(function()
     while true do
         if hasStarted and not isPaused and not isFinished and not isLobby then
@@ -399,6 +354,18 @@ task.spawn(function()
         while not hasStarted do task.wait(0.1) end
         while hasStarted do
             if not isPaused and not isFinished and not isLobby then
+                -- Death detection: if character dies, trigger finish
+                pcall(function()
+                    if lp.Character and lp.Character:FindFirstChild("Humanoid") and lp.Character.Humanoid.Health <= 0 then
+                        if not isFinished then
+                            isFinished = true
+                            currentStatusBase = "You Died"
+                            loopNum = 4                 -- force finish sequence
+                            v1 = FARM_V1_END + 1        -- stop further actions
+                        end
+                    end
+                end)
+
                 if not healPickupCooldown then
                     pcall(function()
                         remoteAction:FireServer(v1)
@@ -410,7 +377,7 @@ task.spawn(function()
                         ProgFill.Size = UDim2.new(math.clamp(progress, 0, 1), 0, 1, 0)
                     end
                     if NProgFill then
-                        NProgFill.Size = ProgFill and ProgFill.Size or UDim2.new(0, 0, 1, 0)
+                        NProgFill.Size = ProgFill and ProgFill.Size or UDim2.new(0,0,1,0)
                     end
                     v1 = v1 + 1
                     v2 = v2 - 1
@@ -419,7 +386,32 @@ task.spawn(function()
                         v1 = FARM_V1_START
                         v2 = FARM_V2_START
                         if loopNum > 3 then
-                            handlePlayAgain()
+                            isFinished = true
+                            currentStatusBase = "Play Again"
+                            pcall(function() lp.Character.Humanoid.Health = 0 end)
+                            task.wait(11)
+                            if PlaceId == 70876832253163 then
+                                repeat
+                                    pcall(function() ReplicatedStorage.Remotes.EndDecision:FireServer(false) end)
+                                    task.wait(1)
+                                until lp.Character and lp.Character:FindFirstChild("Humanoid") and lp.Character.Humanoid.Health > 0
+                            end
+                            isFinished = false
+                            hasStarted = false
+                            isPaused = false
+                            elapsedSeconds = 0
+                            if ToggleBtn then
+                                ToggleBtn.Text = "Start Farm Bond"
+                                ToggleBtn.BackgroundColor3 = Color3.fromRGB(0, 115, 230)
+                            end
+                            currentStatusBase = "Idle"
+                            if ProgFill then ProgFill.Size = UDim2.new(0, 0, 1, 0) end
+                            if NProgFill then NProgFill.Size = UDim2.new(0, 0, 1, 0) end
+                            if autoToggleActive and not isLobby then
+                                startFarming()
+                            else
+                                saveConfig()
+                            end
                         end
                     end
                 end
@@ -442,37 +434,29 @@ task.spawn(function()
         if StatusLabel then
             StatusLabel.Text = totalTxt
         end
-        if isLobby and autoToggleActive then
+        if NStatus then
+            if isLobby and LobbyStatus then
+                NStatus.Text = LobbyStatus.Text
+                if NProgFill and LobbyProgFill then
+                    NProgFill.Size = LobbyProgFill.Size
+                end
+            else
+                NStatus.Text = totalTxt
+            end
+        end
+        if isLobby and LobbyStatus and autoToggleActive then
             local lobbyState = "Idle"
             if LobbyProgFill then
-                if LobbyProgFill.Size.X.Scale < 0.34 then
+                local scale = LobbyProgFill.Size.X.Scale
+                if scale < 0.34 then
                     lobbyState = "Creating a Party" .. dots
-                elseif LobbyProgFill.Size.X.Scale < 0.67 then
+                elseif scale < 0.67 then
                     lobbyState = "Creating a Party" .. dots
                 else
                     lobbyState = "Waiting To Join The Game" .. dots
                 end
             end
-            if LobbyStatus then LobbyStatus.Text = lobbyState end
-            if NStatus then NStatus.Text = lobbyState end
-            if NProgFill and LobbyProgFill then
-                NProgFill.Size = LobbyProgFill.Size
-            end
-        else
-            if NStatus then NStatus.Text = totalTxt end
-        end
-        task.wait(0.5)
-    end
-end)
-
-task.spawn(function()
-    while true do
-        if hasStarted and not isFinished and not isLobby then
-            local character = lp.Character
-            local humanoid = character and character:FindFirstChild("Humanoid")
-            if not character or not humanoid or humanoid.Health <= 0 then
-                handlePlayAgain()
-            end
+            LobbyStatus.Text = lobbyState
         end
         task.wait(0.5)
     end
@@ -485,11 +469,34 @@ function setAutoToggle(state)
             AutoBtn.Text = "Auto Start Game: On"
             AutoBtn.BackgroundColor3 = Color3.fromRGB(0, 160, 80)
             task.spawn(function()
-                while autoToggleActive and isLobby do
-                    local lobbyFill = LobbyProgFill
-                    if lobbyFill then
-                        lobbyFill.Size = UDim2.new(0, 0, 1, 0)
+                local heartbeatConn
+                local startTime
+                local totalDuration = 12  -- seconds for full auto-start cycle
+                local function updateProgress()
+                    if not autoToggleActive or not isLobby or not LobbyProgFill then return end
+                    local elapsed = tick() - startTime
+                    local progress = math.min(elapsed / totalDuration, 1)
+                    LobbyProgFill.Size = UDim2.new(progress, 0, 1, 0)
+                    if NProgFill then
+                        NProgFill.Size = LobbyProgFill.Size
                     end
+                    if progress >= 1 then
+                        if heartbeatConn then
+                            heartbeatConn:Disconnect()
+                            heartbeatConn = nil
+                        end
+                    end
+                end
+
+                while autoToggleActive and isLobby do
+                    if LobbyProgFill then
+                        LobbyProgFill.Size = UDim2.new(0, 0, 1, 0)
+                    end
+                    startTime = tick()
+                    heartbeatConn = (heartbeatConn and heartbeatConn:Disconnect() or nil) -- clean up any old connection
+                    heartbeatConn = RunService.Heartbeat:Connect(updateProgress)
+
+                    -- Touch party zones
                     for step = 1, 4 do
                         if not autoToggleActive then break end
                         local zones = Workspace:FindFirstChild("PartyZones")
@@ -505,19 +512,12 @@ function setAutoToggle(state)
                                 end
                             end
                         end
-                        if lobbyFill then
-                            lobbyFill.Size = UDim2.new((step / 4) * 0.33, 0, 1, 0)
-                        end
                         task.wait(0.3)
                     end
                     if not autoToggleActive then break end
-                    if lobbyFill then
-                        local startF = lobbyFill.Size.X.Scale
-                        for t = 0, 0.5, 0.02 do
-                            lobbyFill.Size = UDim2.new(startF + (0.33 * (t / 0.5)), 0, 1, 0)
-                            task.wait(0.02)
-                        end
-                    end
+
+                    -- Wait before sending party request
+                    task.wait(0.5)
                     pcall(function()
                         remoteParty:FireServer({
                             ["isPrivate"] = false,
@@ -527,16 +527,15 @@ function setAutoToggle(state)
                         })
                     end)
                     if not autoToggleActive then break end
-                    if lobbyFill then
-                        local startF2 = lobbyFill.Size.X.Scale
-                        for t = 0.1, 9, 0.1 do
-                            lobbyFill.Size = UDim2.new(startF2 + (0.34 * (t / 9)), 0, 1, 0)
-                            task.wait(0.1)
-                        end
-                        lobbyFill.Size = UDim2.new(1, 0, 1, 0)
+
+                    -- Wait for game load
+                    task.wait(9)
+                    if LobbyProgFill then
+                        LobbyProgFill.Size = UDim2.new(1, 0, 1, 0)
                     end
                     task.wait(0.5)
                 end
+                if heartbeatConn then heartbeatConn:Disconnect() end
                 if LobbyStatus and LobbyProgFill then
                     LobbyStatus.Text = "Idle"
                     LobbyProgFill.Size = UDim2.new(0, 0, 1, 0)
@@ -545,7 +544,7 @@ function setAutoToggle(state)
         else
             AutoBtn.Text = "Auto Start Game: Off"
             AutoBtn.BackgroundColor3 = Color3.fromRGB(28, 28, 33)
-            if LobbyProgFill then LobbyProgFill.Size = UDim2.new(0, 0, 1, 0) end
+            if LobbyProgFill then LobbyProgFill.Size = UDim2.new(0,0,1,0) end
         end
     elseif autoBtnAction == "replay" then
         if state then
@@ -572,9 +571,9 @@ RunService.Heartbeat:Connect(function()
     if ProgFill then
         local shiny = ProgFill:FindFirstChild("Shiny")
         if shiny then
+            local w = ProgFill.AbsolutePosition.X + ProgFill.AbsoluteSize.X
             if ProgFill.Size.X.Scale > 0.01 then
                 shiny.Visible = true
-                local w = ProgFill.AbsolutePosition.X + ProgFill.AbsoluteSize.X
                 local t = tick() * 1.5
                 local x = (math.sin(t) + 1) / 2 * (w - ProgFill.AbsolutePosition.X)
                 shiny.Position = UDim2.new(0, x - 25, -0.5, 0)
@@ -586,9 +585,9 @@ RunService.Heartbeat:Connect(function()
     if LobbyProgFill then
         local shiny = LobbyProgFill:FindFirstChild("Shiny")
         if shiny then
+            local w = LobbyProgFill.AbsolutePosition.X + LobbyProgFill.AbsoluteSize.X
             if LobbyProgFill.Size.X.Scale > 0.01 then
                 shiny.Visible = true
-                local w = LobbyProgFill.AbsolutePosition.X + LobbyProgFill.AbsoluteSize.X
                 local t = tick() * 1.5
                 local x = (math.sin(t) + 1) / 2 * (w - LobbyProgFill.AbsolutePosition.X)
                 shiny.Position = UDim2.new(0, x - 25, -0.5, 0)
@@ -620,10 +619,11 @@ local function CreateLogo()
     LogoButton.Draggable = true
 
     Instance.new("UICorner", LogoButton).CornerRadius = UDim.new(0, 10)
+    -- White stroke with transparency
     local logoStroke = Instance.new("UIStroke", LogoButton)
     logoStroke.Color = Color3.fromRGB(255, 255, 255)
-    logoStroke.Thickness = 1
     logoStroke.Transparency = 0.5
+    logoStroke.Thickness = 1.2
 
     NotifyFrame = Instance.new("Frame")
     NotifyFrame.Name = "NotifyFrame"
@@ -636,8 +636,8 @@ local function CreateLogo()
     Instance.new("UICorner", NotifyFrame).CornerRadius = UDim.new(0, 8)
     local notifyStroke = Instance.new("UIStroke", NotifyFrame)
     notifyStroke.Color = Color3.fromRGB(255, 255, 255)
-    notifyStroke.Thickness = 1
     notifyStroke.Transparency = 0.5
+    notifyStroke.Thickness = 1.2
 
     NStatus = Instance.new("TextLabel")
     NStatus.Parent = NotifyFrame
